@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include <list>
+#include <algorithm>
 
 #include "optionparser.h"
 
@@ -9,7 +10,7 @@ using namespace std;
 
 // function prototypes
 void CheckPath(const char* path);
-int CASCListFiles(const string &storageName, const string &wildcardMask, const string &listfile);
+int CASCListFiles(const string &storageName, const string &wildcardMask, const string &listfile, list<string> &outFiles);
 int CASCExtractFiles(const string &storageName, list<string> &files, const string &outputDir);
 
 // global const variables
@@ -164,15 +165,25 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK,
 	 //parse CASC Action
 	 if(options[LIST].count() > 0)
 	 {
-		 CASCListFiles(cascStorageName, cascWildcardMask, cascListfile);
+		 list<string> filesResult;
+		 CASCListFiles(cascStorageName, cascWildcardMask, cascListfile, filesResult);
 
 		 exit(0);
 	 }
 
 	 if(options[EXTRACT].count() > 0)
 	 {
-		 CASCExtractFiles(cascStorageName, cascFiles, cascOutputDir);
-		 exit(0);
+		 if(cascFiles.size() == 0)
+		 {
+			 list<string> filesResult;
+			 CASCListFiles(cascStorageName, cascWildcardMask, cascListfile, filesResult);
+			 CASCExtractFiles(cascStorageName, filesResult, cascOutputDir);
+		 }
+		 else
+		 {
+			 CASCExtractFiles(cascStorageName, cascFiles, cascOutputDir);
+			 exit(0);
+		 }
 	 }
 
 	 return 0;
@@ -215,72 +226,85 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK,
  	free(cp);
  }
 
+const string convertToLocalPath(const string &path)
+{
+	string newpath = path;
+
+	std::replace( newpath.begin(), newpath.end(), '\\', '/');
+
+	return newpath;
+}
+
 int CASCExtractFiles(const string &storageName, list<string> &files, const string &outputDir)
 {
     HANDLE hStorage = NULL;        // Open storage handle
     HANDLE hFile  = NULL;          // Storage file handle
-    DWORD dwErrCode = ERROR_SUCCESS; // Result value
     FILE *fileHandle  = NULL;
+    bool result = true;
 
-    if(dwErrCode == ERROR_SUCCESS)
-    {
-        if(!CascOpenStorage(storageName.c_str(), 0, &hStorage))
-            cout << "Error: CascOpenStorage" << endl;
-    }
+	if(CascOpenStorage(storageName.c_str(), 0, &hStorage))
+	{
+		for(list<string>::iterator it = files.begin(); it != files.end(); it++)
+		{
+			// Access the object through iterator
+			string filename = *it;
 
-    for(list<string>::iterator it = files.begin(); it != files.end(); it++)
-    {
-        // Access the object through iterator
-        string filename = *it;
+			string prefixPath = outputDir + "/" + filename;
+			prefixPath = convertToLocalPath(prefixPath);
+			//cout << "filename: " << filename << endl;
+			//cout << "prefixPath: " << prefixPath << endl;
 
-    	string prefixPath = outputDir + "/" + filename;
-    	//cout << "filename: " << filename << endl;
-    	//cout << "prefixPath: " << prefixPath << endl;
+			// Open a file in the storage
+			if(CascOpenFile(hStorage, filename.c_str(), 0, 0, &hFile))
+			{
+				// Read the data from the file
+				char  szBuffer[0x10000];
+				DWORD dwBytes = 1;
 
-        // Open a file in the storage
-        if(dwErrCode == ERROR_SUCCESS)
-        {
-            if(!CascOpenFile(hStorage, filename.c_str(), 0, 0, &hFile))
-                cout << "Error: CascOpenFile" << endl;
-        }
+				CheckPath(prefixPath.c_str());
+				fileHandle = fopen(prefixPath.c_str(), "wb");
+				cout << "Extracting file: " << prefixPath << endl;
 
-        // Read the data from the file
-        if(dwErrCode == ERROR_SUCCESS)
-        {
-        	char  szBuffer[0x10000];
-        	DWORD dwBytes = 1;
+				while(dwBytes != 0)
+				{
+					CascReadFile(hFile, szBuffer, sizeof(szBuffer), &dwBytes);
+					if(dwBytes == 0)
+						break;
 
-        	CheckPath(prefixPath.c_str());
-        	fileHandle = fopen(prefixPath.c_str(), "wb");
+					fwrite(szBuffer, 1, dwBytes, fileHandle);
+				}
 
-        	while(dwBytes != 0)
-        	{
-        		CascReadFile(hFile, szBuffer, sizeof(szBuffer), &dwBytes);
-        		if(dwBytes == 0)
-        			break;
+				if(!fileHandle)
+				{
+					fclose(fileHandle);
+				}
 
-        		fwrite(szBuffer, 1, dwBytes, fileHandle);
-        	}
+				if(!hFile)
+				{
+					CascCloseFile(hFile);
+				}
 
-        	if(!fileHandle)
-        	{
-        		fclose(fileHandle);
-        	}
-
-            if(!hFile)
-            {
-                CascCloseFile(hFile);
-            }
-        }
-    }
+			}
+			else
+			{
+				cout << "Error: CascOpenFile" << endl;
+				result = false;
+			}
+		}
+	}
+	else
+	{
+		cout << "Error: CascOpenStorage" << endl;
+		result = false;
+	}
 
     if(hStorage != NULL)
         CascCloseStorage(hStorage);
 
-    return dwErrCode;
+    return result;
 }
 
-int CASCListFiles(const string &storageName, const string &wildcardMask, const string &listfile)
+int CASCListFiles(const string &storageName, const string &wildcardMask, const string &listfile, list<string> &outFiles)
 {
     HANDLE hStorage = NULL;        // Open storage handle
     HANDLE hFind = NULL; 			// find handle
@@ -306,6 +330,7 @@ int CASCListFiles(const string &storageName, const string &wildcardMask, const s
         	if(foundFile)
         	{
         		string filename = findData.szFileName;
+        		outFiles.push_back(filename);
         		cout << filename << endl;
         	}
         }
