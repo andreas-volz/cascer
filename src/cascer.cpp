@@ -9,9 +9,11 @@
 using namespace std;
 
 // function prototypes
+int parseOptions(int argc, const char **argv);
 void CheckPath(const char* path);
 int CASCListFiles(const string &storageName, const string &wildcardMask, const string &listfile, list<string> &outFiles);
 int CASCExtractFiles(const string &storageName, list<string> &files, const string &outputDir);
+const string convertToLocalPath(const string &path);
 
 // global const variables
 const string appversion = "0.1";
@@ -95,6 +97,7 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK,
 	 argc -= (argc > 0); argv += (argc > 0); // skip program name argv[0] if present
 	 option::Stats  stats(usage, argc, argv);
 	 option::Option options[stats.options_max], buffer[stats.buffer_max];
+
 	 option::Parser parse(usage, argc, argv, options, buffer);
 
 	 if(parse.error())
@@ -235,13 +238,41 @@ const string convertToLocalPath(const string &path)
 	return newpath;
 }
 
+
+
+
+PCASC_FILE_SPAN_INFO GetFileSpanInfo(HANDLE hFile)
+{
+    PCASC_FILE_SPAN_INFO pSpans = NULL;
+    size_t cbLength = 0;
+
+    // Retrieve the full file info
+    CascGetFileInfo(hFile, CascFileSpanInfo, pSpans, cbLength, &cbLength);
+    if(cbLength != 0)
+    {
+        if((pSpans = (PCASC_FILE_SPAN_INFO)(new BYTE[cbLength])) != NULL)
+        {
+            if(CascGetFileInfo(hFile, CascFileSpanInfo, pSpans, cbLength, NULL))
+                return pSpans;
+
+            // in case of error...
+            free(pSpans);
+            pSpans = NULL;
+        }
+    }
+
+    return pSpans;
+}
+
+
+
 int CASCExtractFiles(const string &storageName, list<string> &files, const string &outputDir)
 {
     HANDLE hStorage = NULL;        // Open storage handle
     HANDLE hFile  = NULL;          // Storage file handle
     FILE *fileHandle  = NULL;
     bool result = true;
-
+    cout << "x"<<endl;
 	if(CascOpenStorage(storageName.c_str(), 0, &hStorage))
 	{
 		for(list<string>::iterator it = files.begin(); it != files.end(); it++)
@@ -261,6 +292,8 @@ int CASCExtractFiles(const string &storageName, list<string> &files, const strin
 				char  szBuffer[0x10000];
 				DWORD dwBytes = 1;
 
+				PCASC_FILE_SPAN_INFO cascFileInfo = GetFileSpanInfo(hFile);
+
 				CheckPath(prefixPath.c_str());
 				fileHandle = fopen(prefixPath.c_str(), "wb");
 				cout << "Extracting file: " << prefixPath << endl;
@@ -274,12 +307,12 @@ int CASCExtractFiles(const string &storageName, list<string> &files, const strin
 					fwrite(szBuffer, 1, dwBytes, fileHandle);
 				}
 
-				if(!fileHandle)
+				if(fileHandle != NULL)
 				{
 					fclose(fileHandle);
 				}
 
-				if(!hFile)
+				if(hFile != NULL)
 				{
 					CascCloseFile(hFile);
 				}
@@ -350,6 +383,8 @@ int CASCListFiles(const string &storageName, const string &wildcardMask, const s
 int main(int argc, const char **argv)
 {
   parseOptions(argc, argv);
+
+  cout << "application end" << endl;
 
   return 0;
 }
