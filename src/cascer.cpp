@@ -10,7 +10,7 @@ using namespace std;
 // function prototypes
 void CheckPath(const char* path);
 int CASCListFiles(const string &storageName, const string &wildcardMask, const string &listfile);
-int CASCExtractFiles(const string &storageName, list<string> &files);
+int CASCExtractFiles(const string &storageName, list<string> &files, const string &outputDir);
 
 // global const variables
 const string appversion = "0.1";
@@ -62,7 +62,7 @@ struct Arg: public option::Arg
   }
 };
 
-enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK};
+enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK, OUTPUT};
  const option::Descriptor usage[] =
  {
   {UNKNOWN, 0,"" , ""    ,option::Arg::None, "Usage: cascer [action] [option] [archive] [files]\n\n"
@@ -77,6 +77,7 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK}
   {UNKNOWN, 0,"" , ""    ,option::Arg::None, "\nOptions:" },
   {LISTFILE,	0,"L" , "listfile",Arg::Required, "  --listfile, -L  \t\tAdditional external listfile" },
   {MASK,	0,"m" , "mask",Arg::Required, "  --mask, -m  \t\tWildcard mask to specify files" },
+  {OUTPUT,	0,"o" , "output",Arg::Required, "  --output, -o  \t\tPrefix output directory where all extracted files will be relative stored" },
   {UNKNOWN, 0,""  ,  ""   ,option::Arg::None, "\narchive \t\tDirectory which contains the game data\n"
                                               "files \t\tList of files to extract\n"},
   {0,0,0,0,0,0}
@@ -88,6 +89,7 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK}
 	 string cascWildcardMask;
 	 string cascListfile;
 	 list<string> cascFiles;
+	 string cascOutputDir = "data";
 
 	 argc -= (argc > 0); argv += (argc > 0); // skip program name argv[0] if present
 	 option::Stats  stats(usage, argc, argv);
@@ -106,6 +108,11 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK}
 	 if(options[MASK].count() > 0)
 	 {
 		 cascWildcardMask = options[MASK].arg;
+	 }
+
+	 if(options[OUTPUT].count() > 0)
+	 {
+		 cascOutputDir = options[OUTPUT].arg;
 	 }
 
 	 // parse additional options
@@ -164,7 +171,7 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK}
 
 	 if(options[EXTRACT].count() > 0)
 	 {
-		 CASCExtractFiles(cascStorageName, cascFiles);
+		 CASCExtractFiles(cascStorageName, cascFiles, cascOutputDir);
 		 exit(0);
 	 }
 
@@ -208,7 +215,7 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK}
  	free(cp);
  }
 
-int CASCExtractFiles(const string &storageName, list<string> &files)
+int CASCExtractFiles(const string &storageName, list<string> &files, const string &outputDir)
 {
     HANDLE hStorage = NULL;        // Open storage handle
     HANDLE hFile  = NULL;          // Storage file handle
@@ -226,7 +233,9 @@ int CASCExtractFiles(const string &storageName, list<string> &files)
         // Access the object through iterator
         string filename = *it;
 
-        //cout << "filename: " << filename << endl;
+    	string prefixPath = outputDir + "/" + filename;
+    	//cout << "filename: " << filename << endl;
+    	//cout << "prefixPath: " << prefixPath << endl;
 
         // Open a file in the storage
         if(dwErrCode == ERROR_SUCCESS)
@@ -241,8 +250,8 @@ int CASCExtractFiles(const string &storageName, list<string> &files)
         	char  szBuffer[0x10000];
         	DWORD dwBytes = 1;
 
-        	CheckPath(filename.c_str());
-        	fileHandle = fopen(filename.c_str(), "wb");
+        	CheckPath(prefixPath.c_str());
+        	fileHandle = fopen(prefixPath.c_str(), "wb");
 
         	while(dwBytes != 0)
         	{
