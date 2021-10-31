@@ -286,8 +286,8 @@ int CASCListFiles(const string &storageName, const string &wildcardMask, const s
 
     int i = 0;
     bool foundFile = true;
-    hFind = CascFindFirstFile(hStorage, wildcardMask.empty() ? wildcardMask.c_str() : NULL, &findData,
-    		listfile.empty() ? listfile.c_str() : NULL);
+    hFind = CascFindFirstFile(hStorage, wildcardMask.empty() ? NULL : wildcardMask.c_str(), &findData,
+    		listfile.empty() ? NULL : listfile.c_str());
     if(hFind != INVALID_HANDLE_VALUE )
 	{
         while(foundFile)
