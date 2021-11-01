@@ -11,9 +11,10 @@ using namespace std;
 // function prototypes
 int parseOptions(int argc, const char **argv);
 void CheckPath(const char* path);
-int CASCListFiles(const string &storageName, const string &wildcardMask, const string &listfile, list<string> &outFiles);
+int CASCListFiles(const string &storageName, const string &wildcardMask, const string &listfile, list<string> &outFiles, const string &format);
 int CASCExtractFiles(const string &storageName, list<string> &files, const string &outputDir);
 const string convertToLocalPath(const string &path);
+void cascPrintFile(const string &format, const string &filename);
 
 // global const variables
 const string appversion = "0.1";
@@ -65,7 +66,7 @@ struct Arg: public option::Arg
   }
 };
 
-enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK, OUTPUT};
+enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK, OUTPUT, FORMAT};
  const option::Descriptor usage[] =
  {
   {UNKNOWN, 0,"" , ""    ,option::Arg::None, "Usage: cascer [action] [option] [archive] [files]\n\n"
@@ -78,9 +79,10 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK,
   {EXTRACT,	0,"e" , "list",Arg::None, "  --extract, -e  \t\tList file(s) of archive" },
   // Options
   {UNKNOWN, 0,"" , ""    ,option::Arg::None, "\nOptions:" },
-  {LISTFILE,	0,"L" , "listfile",Arg::Required, "  --listfile, -L  \t\tAdditional external listfile" },
-  {MASK,	0,"m" , "mask",Arg::Required, "  --mask, -m  \t\tWildcard mask to specify files" },
-  {OUTPUT,	0,"o" , "output",Arg::Required, "  --output, -o  \t\tPrefix output directory where all extracted files will be relative stored" },
+  {LISTFILE,	0,"L" , "listfile",Arg::Required, "  --listfile, -L  \t\tAdditional external listfile." },
+  {MASK,	0,"m" , "mask",Arg::Required, "  --mask, -m  \t\tWildcard mask to specify files." },
+  {OUTPUT,	0,"o" , "output",Arg::Required, "  --output, -o  \t\tPrefix output directory where all extracted files will be relative stored." },
+  {FORMAT,	0,"f" , "format",Arg::Required, "  --format, -f  \t\tFormat of the list output. Could useful for used for extractor tools input." },
   {UNKNOWN, 0,""  ,  ""   ,option::Arg::None, "\narchive \t\tDirectory which contains the game data\n"
                                               "files \t\tList of files to extract\n"},
   {0,0,0,0,0,0}
@@ -93,6 +95,7 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK,
 	 string cascListfile;
 	 list<string> cascFiles;
 	 string cascOutputDir = "data";
+	 string cascFormat;
 
 	 argc -= (argc > 0); argv += (argc > 0); // skip program name argv[0] if present
 	 option::Stats  stats(usage, argc, argv);
@@ -117,6 +120,11 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK,
 	 if(options[OUTPUT].count() > 0)
 	 {
 		 cascOutputDir = options[OUTPUT].arg;
+	 }
+
+	 if(options[FORMAT].count() > 0)
+	 {
+		 cascFormat = options[FORMAT].arg;
 	 }
 
 	 // parse additional options
@@ -169,7 +177,7 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK,
 	 if(options[LIST].count() > 0)
 	 {
 		 list<string> filesResult;
-		 CASCListFiles(cascStorageName, cascWildcardMask, cascListfile, filesResult);
+		 CASCListFiles(cascStorageName, cascWildcardMask, cascListfile, filesResult, cascFormat);
 
 		 exit(0);
 	 }
@@ -179,7 +187,7 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK,
 		 if(cascFiles.size() == 0)
 		 {
 			 list<string> filesResult;
-			 CASCListFiles(cascStorageName, cascWildcardMask, cascListfile, filesResult);
+			 CASCListFiles(cascStorageName, cascWildcardMask, cascListfile, filesResult, cascFormat);
 			 CASCExtractFiles(cascStorageName, filesResult, cascOutputDir);
 		 }
 		 else
@@ -238,9 +246,6 @@ const string convertToLocalPath(const string &path)
 	return newpath;
 }
 
-
-
-
 PCASC_FILE_SPAN_INFO GetFileSpanInfo(HANDLE hFile)
 {
     PCASC_FILE_SPAN_INFO pSpans = NULL;
@@ -264,15 +269,13 @@ PCASC_FILE_SPAN_INFO GetFileSpanInfo(HANDLE hFile)
     return pSpans;
 }
 
-
-
 int CASCExtractFiles(const string &storageName, list<string> &files, const string &outputDir)
 {
     HANDLE hStorage = NULL;        // Open storage handle
     HANDLE hFile  = NULL;          // Storage file handle
     FILE *fileHandle  = NULL;
     bool result = true;
-    cout << "x"<<endl;
+
 	if(CascOpenStorage(storageName.c_str(), 0, &hStorage))
 	{
 		for(list<string>::iterator it = files.begin(); it != files.end(); it++)
@@ -295,7 +298,8 @@ int CASCExtractFiles(const string &storageName, list<string> &files, const strin
 				// quick check if file has valid info
 				// TODO: later more details to read out!
 				PCASC_FILE_SPAN_INFO cascFileInfo = GetFileSpanInfo(hFile);
-				cout << "Extracting file: " << prefixPath << endl;	if(cascFileInfo)
+				cout << "Extracting file: " << prefixPath << endl;
+				if(cascFileInfo)
 				{
 					CheckPath(prefixPath.c_str());
 					fileHandle = fopen(prefixPath.c_str(), "wb");
@@ -345,7 +349,7 @@ int CASCExtractFiles(const string &storageName, list<string> &files, const strin
     return result;
 }
 
-int CASCListFiles(const string &storageName, const string &wildcardMask, const string &listfile, list<string> &outFiles)
+int CASCListFiles(const string &storageName, const string &wildcardMask, const string &listfile, list<string> &outFiles, const string &format)
 {
     HANDLE hStorage = NULL;        // Open storage handle
     HANDLE hFind = NULL; 			// find handle
@@ -372,7 +376,7 @@ int CASCListFiles(const string &storageName, const string &wildcardMask, const s
         	{
         		string filename = findData.szFileName;
         		outFiles.push_back(filename);
-        		cout << filename << endl;
+        		cascPrintFile(format, filename);
         	}
         }
 	}
@@ -388,11 +392,51 @@ int CASCListFiles(const string &storageName, const string &wildcardMask, const s
     return dwErrCode;
 }
 
+/**
+ * Use a 'date' like FORMAT string to control the output string.
+ * Most useful for generating a array initializer header for other tools.
+ *
+ * @param format A string e.g. {X,"%f",0,"%f",1}
+ */
+void cascPrintFile(const string &format, const string &filename)
+{
+	for (auto it = format.cbegin() ; it != format.cend(); ++it)
+	{
+		char c = *it;
+
+		if(c == '%')
+		{
+			if(it + 1 != format.cend())
+			{
+				it++;
+			}
+			char formatControl = *it;
+
+			switch(formatControl)
+			{
+			case 'f':
+				cout << filename;
+				break;
+			default:
+				//cout << "#ignore";
+				break;
+			}
+
+		}
+		else
+		{
+			cout << c;
+		}
+	}
+	cout << endl;
+}
+
 int main(int argc, const char **argv)
 {
-  parseOptions(argc, argv);
+	parseOptions(argc, argv);
 
-  cout << "application end" << endl;
 
-  return 0;
+	cout << "application end" << endl;
+
+	return 0;
 }
