@@ -382,9 +382,9 @@ int CASCListFiles(const string &storageName, const string &wildcardMask, const s
         while(foundFile)
         {
         	foundFile = CascFindNextFile(hFind, &findData);
-        	i++;
         	if(foundFile)
         	{
+        		i++;
         		string filename = findData.szFileName;
         		outFiles.push_back(filename);
         		cascPrintFile(format, filename);
