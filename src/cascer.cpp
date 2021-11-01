@@ -13,7 +13,9 @@ int parseOptions(int argc, const char **argv);
 void CheckPath(const char* path);
 int CASCListFiles(const string &storageName, const string &wildcardMask, const string &listfile, list<string> &outFiles, const string &format);
 int CASCExtractFiles(const string &storageName, list<string> &files, const string &outputDir);
-const string convertToLocalPath(const string &path);
+const string convertWinToUnixPath(const string &path);
+const string convertUnixToWinPath(const string &path);
+const string convertUnixToWinEscapePath(const string &path);
 void cascPrintFile(const string &format, const string &filename);
 
 // global const variables
@@ -95,7 +97,7 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK,
 	 string cascListfile;
 	 list<string> cascFiles;
 	 string cascOutputDir = "data";
-	 string cascFormat;
+	 string cascFormat = "%f"; // default is just the name
 
 	 argc -= (argc > 0); argv += (argc > 0); // skip program name argv[0] if present
 	 option::Stats  stats(usage, argc, argv);
@@ -237,11 +239,20 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK,
  	free(cp);
  }
 
-const string convertToLocalPath(const string &path)
+const string convertWinToUnixPath(const string &path)
 {
 	string newpath = path;
 
-	std::replace( newpath.begin(), newpath.end(), '\\', '/');
+	std::replace(newpath.begin(), newpath.end(), '\\', '/');
+
+	return newpath;
+}
+
+const string convertUnixToWinPath(const string &path)
+{
+	string newpath = path;
+
+	std::replace(newpath.begin(), newpath.end(), '/', '\\');
 
 	return newpath;
 }
@@ -284,7 +295,7 @@ int CASCExtractFiles(const string &storageName, list<string> &files, const strin
 			string filename = *it;
 
 			string prefixPath = outputDir + "/" + filename;
-			prefixPath = convertToLocalPath(prefixPath);
+			prefixPath = convertWinToUnixPath(prefixPath);
 			//cout << "filename: " << filename << endl;
 			//cout << "prefixPath: " << prefixPath << endl;
 
@@ -298,7 +309,7 @@ int CASCExtractFiles(const string &storageName, list<string> &files, const strin
 				// quick check if file has valid info
 				// TODO: later more details to read out!
 				PCASC_FILE_SPAN_INFO cascFileInfo = GetFileSpanInfo(hFile);
-				cout << "Extracting file: " << prefixPath << endl;
+
 				if(cascFileInfo)
 				{
 					CheckPath(prefixPath.c_str());
@@ -415,7 +426,10 @@ void cascPrintFile(const string &format, const string &filename)
 			switch(formatControl)
 			{
 			case 'f':
-				cout << filename;
+				cout << convertWinToUnixPath(filename);
+				break;
+			case 'F':
+				cout << convertUnixToWinPath(filename);
 				break;
 			default:
 				//cout << "#ignore";
