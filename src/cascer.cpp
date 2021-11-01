@@ -292,29 +292,37 @@ int CASCExtractFiles(const string &storageName, list<string> &files, const strin
 				char  szBuffer[0x10000];
 				DWORD dwBytes = 1;
 
+				// quick check if file has valid info
+				// TODO: later more details to read out!
 				PCASC_FILE_SPAN_INFO cascFileInfo = GetFileSpanInfo(hFile);
-
-				CheckPath(prefixPath.c_str());
-				fileHandle = fopen(prefixPath.c_str(), "wb");
-				cout << "Extracting file: " << prefixPath << endl;
-
-				while(dwBytes != 0)
+				cout << "Extracting file: " << prefixPath << endl;	if(cascFileInfo)
 				{
-					CascReadFile(hFile, szBuffer, sizeof(szBuffer), &dwBytes);
-					if(dwBytes == 0)
-						break;
+					CheckPath(prefixPath.c_str());
+					fileHandle = fopen(prefixPath.c_str(), "wb");
+					cout << "Extracting file: " << prefixPath << endl;
 
-					fwrite(szBuffer, 1, dwBytes, fileHandle);
+					while(dwBytes != 0)
+					{
+						CascReadFile(hFile, szBuffer, sizeof(szBuffer), &dwBytes);
+						if(dwBytes == 0)
+							break;
+
+						fwrite(szBuffer, 1, dwBytes, fileHandle);
+					}
+
+					if(fileHandle != NULL)
+					{
+						fclose(fileHandle);
+					}
+
+					if(hFile != NULL)
+					{
+						CascCloseFile(hFile);
+					}
 				}
-
-				if(fileHandle != NULL)
+				else
 				{
-					fclose(fileHandle);
-				}
-
-				if(hFile != NULL)
-				{
-					CascCloseFile(hFile);
+					cout << "*NOT* Extracting file (invalid info!): " << prefixPath << endl;
 				}
 
 			}
