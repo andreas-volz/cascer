@@ -15,7 +15,6 @@ int CASCListFiles(const string &storageName, const string &wildcardMask, const s
 int CASCExtractFiles(const string &storageName, list<string> &files, const string &outputDir);
 const string convertWinToUnixPath(const string &path);
 const string convertUnixToWinPath(const string &path);
-const string convertUnixToWinEscapePath(const string &path);
 void cascPrintFile(const string &format, const string &filename);
 
 // global const variables
@@ -78,7 +77,7 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK,
   {INFO, 	0,"i" , "info",Arg::None, "  --info, -i  \t\tShow info about archive" },
   {LIST,	0,"l" , "list",Arg::None, "  --list, -ĺ  \t\tList file(s) of archive" },
   {VERSION,	0,"V" , "version",Arg::None, "  --version, -V  \t\tShow version license information" },
-  {EXTRACT,	0,"e" , "list",Arg::None, "  --extract, -e  \t\tList file(s) of archive" },
+  {EXTRACT,	0,"e" , "extract",Arg::None, "  --extract, -e  \t\tExtract file(s) from archive" },
   // Options
   {UNKNOWN, 0,"" , ""    ,option::Arg::None, "\nOptions:" },
   {LISTFILE,	0,"L" , "listfile",Arg::Required, "  --listfile, -L  \t\tAdditional external listfile." },
@@ -138,13 +137,13 @@ enum  optionIndex { UNKNOWN, HELP, LIST, VERSION, EXTRACT, INFO, LISTFILE, MASK,
 		 if(i == 0)
 		 {
 			 cascStorageName = parse.nonOption(i);
-			 cout << "archive: " << ": " << cascStorageName << endl;
+			 cerr << "archive: " << ": " << cascStorageName << endl;
 		 }
 		 else
 		 {
 			 string cascFile = parse.nonOption(i);
 			 cascFiles.push_back(cascFile);
-			 cout << "file #" << i << ": " << cascFile << endl;
+			 cerr << "file #" << i << ": " << cascFile << endl;
 		 }
 	 }
 
@@ -314,7 +313,7 @@ int CASCExtractFiles(const string &storageName, list<string> &files, const strin
 				{
 					CheckPath(prefixPath.c_str());
 					fileHandle = fopen(prefixPath.c_str(), "wb");
-					cout << "Extracting file: " << prefixPath << endl;
+					cerr << "Extracting file: " << prefixPath << endl;
 
 					while(dwBytes != 0)
 					{
@@ -392,7 +391,7 @@ int CASCListFiles(const string &storageName, const string &wildcardMask, const s
         }
 	}
 
-    cout << "#files found: " << i << endl;
+    cerr << "#files found: " << i << endl;
 
     // Cleanup and exit
     if(hFind != NULL)
@@ -450,7 +449,7 @@ int main(int argc, const char **argv)
 	parseOptions(argc, argv);
 
 
-	cout << "application end" << endl;
+	cerr << "application end" << endl;
 
 	return 0;
 }
